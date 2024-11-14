@@ -1,0 +1,11 @@
+name: sfm
+channels:
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+dependencies:
+  - python=3.10
+  - matplotlib
+  - ipykernel
+  - pyqt
+  - fastai::opencv-python-headless
+prefix: /home/dokyun/anaconda3/envs/sfm
