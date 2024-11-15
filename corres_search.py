@@ -15,14 +15,17 @@ def extract_features(img):
     return kp,desc
 
 def match_keypoints(desc1, desc2):
-    bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+    bf = cv.BFMatcher(cv.NORM_L1, crossCheck=True)
     matches = bf.match(desc1, desc2)
     matches = sorted(matches, key = lambda x:x.distance)
     return matches
 
-def draw_matches(img1, img2, kp1, kp2, matches, num_matches):
-    img3 = cv.drawMatches(img1,kp1,img2,kp2,matches[:num_matches],None,flags=cv.DrawMatchesFlags_NOT_DRAWN_SINGLE_POINTS)
-    return img3
+def draw_matches(img1, img2, kp1, kp2, matches, num_matches=None):
+    if not num_matches:
+        num_matches = len(matches)
+        
+    img_matched = cv.drawMatches(img1,kp1,img2,kp2,matches[:num_matches],None) # type: ignore
+    return img_matched
 
 def calcualte_essential_matrix():
     pass
