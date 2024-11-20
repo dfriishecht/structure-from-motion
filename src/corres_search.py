@@ -118,10 +118,10 @@ def calculate_fund_matrix(pts1, pts2):
 
 def estimate_essential_matrix(K, pts1, pts2):
     # E = K2.T @ F @ K1
-    E, mask = cv.findEssentialMatrix(pts1, pts2, K, method = cv.RANSAC)
+    E, mask = cv.findEssentialMat(pts1, pts2, K, method = cv.RANSAC)
     return E, mask
 
-def get_epipolar_line(pts1, pts2, F):
+def get_epipolar_line(img1, img2, F, pts1, pts2):
     """
     Draw epipolar lines on the images given the fundamental matrix and point correspondences.
 
