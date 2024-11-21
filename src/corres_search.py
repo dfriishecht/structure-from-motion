@@ -52,10 +52,12 @@ def match_keypoints_flann(
     good_matches = []
     left_pts, right_pts = [], []
     for m, n in matches:
-        if m.distance < lowe_ratio * n.distance:
-            good_matches.append(m)
-            left_pts.append(kp1[m.trainIdx].pt)
-            right_pts.append(kp2[n.trainIdx].pt)
+        if m.trainIdx < len(kp2) and n.trainIdx < len(kp2):
+            if m.distance < lowe_ratio * n.distance:
+                good_matches.append(m)
+
+    left_pts.append(kp1[m.queryIdx].pt for m in good_matches)
+    right_pts.append(kp2[m.trainIdx].pt for m in good_matches)
 
     return good_matches, left_pts, right_pts
 
