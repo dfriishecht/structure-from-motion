@@ -32,6 +32,22 @@ def match_keypoints(desc1, desc2):
     matches = sorted(matches, key = lambda x:x.distance)
     return matches
 
+def match_keypoints_flann(desc1, desc2, n_trees=5, n_checks=50, lowe_ratio=0.8):
+    FLANN_INDEX_KDTREE = 1
+    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = n_trees) # number of trees in the KD-Tree, higher the better, but slower
+    search_params = dict(checks = n_checks) # number of recursive checks, higher the better, but slower
+    
+    flann = cv.FlannBasedMatcher(index_params,search_params) # type: ignore
+    matches = flann.knnMatch(desc1,desc2,k=2)
+    
+    good_matches = []
+    for m, n in matches:
+        if m.distance < lowe_ratio * n.distance:
+            good_matches.append(m)
+
+    return good_matches
+
+
 def normalize_points(points):
     """
     Normalize 2D points for the 8-point algorithm.
@@ -114,6 +130,13 @@ def calculate_fund_matrix(pts1, pts2):
     F = T2.T @ F @ T1
 
     return F
+
+
+
+def calculate_fund_mat_ransac(pts1, pts2):
+    pass
+
+
 
 
 def estimate_essential_matrix(K, pts1, pts2):
