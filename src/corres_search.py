@@ -28,7 +28,7 @@ def extract_features(img: np.ndarray, intr_mat=None, dist_coeff=None) -> tuple:
     return kp, desc
 
 
-def match_keypoints(desc1, desc2):
+def match_keypoints_bf(desc1, desc2):
     bf = cv.BFMatcher(cv.NORM_L1, crossCheck=True)
     matches = bf.match(desc1, desc2)
     matches = sorted(matches, key=lambda x: x.distance)
