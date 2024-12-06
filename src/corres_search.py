@@ -36,7 +36,7 @@ def match_keypoints_bf(desc1, desc2):
 
 
 def match_keypoints_flann(
-    kp1, desc1, kp2, desc2, n_trees=5, n_checks=50, lowe_ratio=0.8
+    img1, img2, n_trees=5, n_checks=50, lowe_ratio=0.8
 ):
     FLANN_INDEX_KDTREE = 1
     index_params = dict(
@@ -45,8 +45,11 @@ def match_keypoints_flann(
     search_params = dict(
         checks=n_checks
     )  # number of recursive checks, higher the better, but slower
-
     flann = cv.FlannBasedMatcher(index_params, search_params)  # type: ignore
+
+    kp1, desc1 = extract_features(img1)
+    kp2, desc2 = extract_features(img2)
+
     matches = flann.knnMatch(desc1, desc2, k=2)
 
     good_matches = []
@@ -59,7 +62,7 @@ def match_keypoints_flann(
     left_pts.append(kp1[m.queryIdx].pt for m in good_matches)
     right_pts.append(kp2[m.trainIdx].pt for m in good_matches)
 
-    return good_matches, left_pts, right_pts
+    return left_pts, right_pts
 
 
 def normalize_points(points):
