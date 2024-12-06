@@ -50,6 +50,38 @@ def triangulate(P0: np.ndarray, P1: np.ndarray, pts0: np.ndarray, pts1: np.ndarr
     return points_3d
 
 
+def PnP(X, p, K, d, p_0, initial):
+    """
+    Recover camera rotation and translation from 3D and 2D points
+
+    Args:
+        X: 3D points
+        p: Corresponding 2D points
+        K: Camera intrinsic matrix
+        d: distortion coefficient
+        p_0: 
+
+    """
+    if initial == 1:
+        X = X[:, 0, :]
+        p = p.T
+        p_0 = p_0.T
+
+
+    ret, rvecs, t, inliers = cv.solvePnPRansac(X, p, K, d, cv.SOLVEPNP_ITERATIVE) # type: ignore
+
+    R, _ = cv.Rodrigues(rvecs)
+
+
+    # Filter out bad 2D-3D correspondences
+    if inliers is not None:
+        p = p[inliers[:, 0]]
+        X = X[inliers[:, 0]]
+        p_0 = p_0[inliers[:, 0]]
+
+    return R, t, p, X, p_0
+
+
 
 
 if __name__ == "__main__":
