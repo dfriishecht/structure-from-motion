@@ -49,6 +49,45 @@ def triangulate(P0: np.ndarray, P1: np.ndarray, pts0: np.ndarray, pts1: np.ndarr
 
     return points_3d
 
+# Calculation for Reprojection error in main pipeline
+def reprojection_error(X, pts, Rt, K, homogenity):
+    """
+    Calculates the error between 2D image points and the corresponding 3D
+    points projected back down to the image plane.
+
+    Args:
+        X: 4xN matrix of 3D points in homogenous coordinates.
+        pts: Nx2 array of 2D image points that correspond to 3D points in X.
+        Rt: A 3x4 matrix representing the camera pose (rotation R and translation t).
+        K: The 3x3 camera intrinsic matrix
+        homogenity: A flag for if the 3D points are homogenous (1) or cartesian (0).
+    
+    Returns:
+        total_error
+        X
+        proj
+    """
+    total_error = 0
+    R = Rt[:3, :3]
+    translation = Rt[:3, 3]
+
+    rotation, _ = cv.Rodrigues(R)
+
+    if homogenity:
+       X = cv.convertPointsFromHomogeneous(X.T)
+    
+    proj, _ = cv.projectPoints(X, rotation, translation, K, distCoeffs=None) #proj is Nx2 array of reprojected 2D points
+    proj = np.float32(proj[:, 0, :])
+    pts = np.float32(pts)
+    if homogenity:
+        total_error = cv.norm(proj, pts.T, cv.NORM_L2)
+    else:
+        total_error = cv.norm(proj, pts, cv.NORM_L2)
+    pts = pts.T
+    total_error = total_error / len(proj)
+
+    return total_error, X, proj
+
 
 
 
@@ -74,7 +113,7 @@ if __name__ == "__main__":
 
     print(pts0.T.shape)
 
-    triangulate(P0, P1, pts0, pts1)
-    point3d = (cv.triangulatePoints(P0, P1, pts0.T, pts1.T))
+    point3d = triangulate(P0, P1, pts0, pts1)
     print(point3d)
+    proj = reprojection_error(point3d, pts0, )
 
