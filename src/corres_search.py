@@ -68,8 +68,8 @@ def match_keypoints_flann(
             if m.distance < lowe_ratio * n.distance:
                 good_matches.append(m)
 
-    left_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]) # type: ignore
-    right_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]) # type: ignore
+    left_pts = np.array([kp1[m.queryIdx].pt for m in good_matches]).astype('float32') # type: ignore
+    right_pts = np.array([kp2[m.trainIdx].pt for m in good_matches]).astype('float32') # type: ignore
 
     return left_pts, right_pts
 
