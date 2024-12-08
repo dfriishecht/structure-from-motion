@@ -23,16 +23,26 @@ def extract_features(img: np.ndarray, intr_mat=None, dist_coeff=None) -> tuple:
     if intr_mat and dist_coeff:
         img = cv.undistort(img, intr_mat, dist_coeff)  # type: ignore
 
+    img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     sift = cv.SIFT.create()
     kp, desc = sift.detectAndCompute(img, None)  # type: ignore
     return kp, desc
 
 
-def match_keypoints_bf(desc1, desc2):
-    bf = cv.BFMatcher(cv.NORM_L1, crossCheck=True)
-    matches = bf.match(desc1, desc2)
-    matches = sorted(matches, key=lambda x: x.distance)
-    return matches
+def match_keypoints_bf(img0, img1):
+    kp0, desc0 = extract_features(img0)
+    kp1, desc1 = extract_features(img1)
+    bf = cv.BFMatcher(cv.NORM_L1, crossCheck=False)
+    matches = bf.knnMatch(desc0, desc1, k= 2)
+
+    good = []
+    for m,n in matches:
+        if m.distance < 0.70 * n.distance:
+            good.append(m)
+        
+    pts0 = np.float32([kp0[m.queryIdx].pt for m in good]) # type: ignore
+    pts1 = np.float32([kp1[m.trainIdx].pt for m in good]) # type: ignore
+    return pts0, pts1
 
 
 def match_keypoints_flann(
@@ -53,14 +63,13 @@ def match_keypoints_flann(
     matches = flann.knnMatch(desc1, desc2, k=2)
 
     good_matches = []
-    left_pts, right_pts = [], []
     for m, n in matches:
         if m.trainIdx < len(kp2) and n.trainIdx < len(kp2):
             if m.distance < lowe_ratio * n.distance:
                 good_matches.append(m)
 
-    left_pts.append(kp1[m.queryIdx].pt for m in good_matches)
-    right_pts.append(kp2[m.trainIdx].pt for m in good_matches)
+    left_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches])
+    right_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches])
 
     return left_pts, right_pts
 
