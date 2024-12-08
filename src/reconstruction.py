@@ -214,6 +214,30 @@ def PnP(X, p, K, d, p_0, initial):
 
     return R, t, p, X, p_0
 
+def common_points(right_pts_ref, left_pts, right_pts):
+
+    idx1 = []
+    idx2 = []
+    for i in range(right_pts_ref.shape[0]):
+        match = np.where(left_pts==right_pts_ref[i, :])
+        if match[0].size == 0:
+            pass
+        else:
+            idx1.append(i)
+            idx2.append(match[0][0])
+        
+    temp_arr1 = np.ma.array(left_pts, mask=False)
+    temp_arr1.mask[idx2] = True
+    temp_arr1 = temp_arr1.compressed()
+    temp_arr1 = temp_arr1.reshape(int(temp_arr1.shape[0] / 2), 2)
+
+    temp_arr2 = np.ma.array(right_pts, mask=False)
+    temp_arr2.mask[idx2] = True
+    temp_arr2 = temp_arr2.compressed()
+    temp_arr2 = temp_arr2.reshape(int(temp_arr2.shape[0]/2), 2)
+        
+    return np.array(idx1), np.array(idx2), temp_arr1, temp_arr2
+
 
 
 
