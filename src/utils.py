@@ -1,8 +1,32 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import cv2
-import numpy as np
 import glob
+import cv2 as cv
+import os
+from pathlib import Path
+
+def capture_from_laptop():
+    Path('capture/').mkdir(parents=True, exist_ok=True)
+    cap = cv.VideoCapture(0)
+    if not cap.isOpened():
+        print("Cannot access camera!")
+        exit()
+    i = 0
+    while True:
+        ret, frame = cap.read()
+
+        if not ret:
+            print("Can't receive frame. Exiting...")
+            break
+        
+        cv.imshow('frame', frame)
+        if cv.waitKey(1) == ord('c'):
+            cv.imwrite(f'capture/frame{i}.png', frame)
+            i += 1
+        if cv.waitKey(1) == ord('q'):
+            break
+    cap.release()
+    cv.destroyAllWindows
 
 
 def get_intrinsic(device_name: str) -> tuple:
@@ -23,11 +47,11 @@ def get_intrinsic(device_name: str) -> tuple:
 
     # Loop over your images
     for fname in images:
-        img = cv2.imread(fname)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img = cv.imread(fname)
+        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         
         # Find the chessboard corners
-        ret, corners = cv2.findChessboardCorners(gray, chessboard_size, None)
+        ret, corners = cv.findChessboardCorners(gray, chessboard_size, None)
         
         if ret:
             objpoints.append(objp)  # Add 3D points
@@ -35,7 +59,7 @@ def get_intrinsic(device_name: str) -> tuple:
 
 
     # Perform camera calibration to find the intrinsic matrix and distortion coefficients
-    ret, camera_matrix, dist_coeffs, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None) # type: ignore
+    ret, camera_matrix, dist_coeffs, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None) # type: ignore
 
     # Print out the intrinsic matrix
     print("Camera matrix:\n", camera_matrix)
@@ -60,14 +84,9 @@ def plot_3d(pts_3d: np.ndarray):
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
+    plt.axis('off')
     plt.show()
 
 
 if __name__ == "__main__":
-    data = np.array([
-    [1, 2, 3],
-    [4, 5, 6],
-    [7, 8, 9],
-    [10, 11, 12]
-    ])
-    plot_3d(data)
+    capture_from_laptop()
