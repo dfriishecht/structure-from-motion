@@ -68,8 +68,8 @@ def match_keypoints_flann(
             if m.distance < lowe_ratio * n.distance:
                 good_matches.append(m)
 
-    left_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches])
-    right_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches])
+    left_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]) # type: ignore
+    right_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]) # type: ignore
 
     return left_pts, right_pts
 
@@ -158,16 +158,6 @@ def calculate_fund_matrix(pts1, pts2):
     F = T2.T @ F @ T1
 
     return F
-
-
-def calculate_fund_mat_ransac(pts1, pts2):
-    pass
-
-
-def estimate_essential_matrix(K, pts1, pts2):
-    # E = K2.T @ F @ K1
-    E, mask = cv.findEssentialMat(pts1, pts2, K, method=cv.RANSAC)
-    return E, mask
 
 
 def get_epipolar_line(img1, img2, F, pts1, pts2):
