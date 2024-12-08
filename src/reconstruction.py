@@ -47,7 +47,7 @@ def triangulate(P0: np.ndarray, P1: np.ndarray, pts0: np.ndarray, pts1: np.ndarr
         X_cartesian = X_hom[0:3] / X_hom[3]
         points_3d.append(X_cartesian)
 
-    return points_3d
+    return np.array(points_3d)
 
 # Calculation for Reprojection error in main pipeline
 def reprojection_error(X, pts, Rt, K, homogenity):
