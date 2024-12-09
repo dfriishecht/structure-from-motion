@@ -5,6 +5,15 @@ import cv2 as cv
 import os
 from pathlib import Path
 
+def img_downscale(img, downscale):
+	downscale = int(downscale/2)
+	i = 1
+	while(i <= downscale):
+		img = cv.pyrDown(img)
+		i = i + 1
+	return img
+
+
 def capture_from_laptop():
     Path('capture/').mkdir(parents=True, exist_ok=True)
     cap = cv.VideoCapture(0)
