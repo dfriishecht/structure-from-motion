@@ -1,133 +1,111 @@
-"""
-Incremental SFM
-"""
-
 import os
+import numpy as np
+import cv2 as cv
 from tqdm import tqdm
-
 from src.utils import *
 from src.corres_search import *
 from src.reconstruction import *
 
-# Intrinsic for Gustav dataset
-K = np.array([[2393.952166119461, -3.410605131648481e-13, 932.3821770809047], [0, 2398.118540286656, 628.2649953288065], [0, 0, 1]])
+# Intrinsic matrix for the Gustav dataset
+K = np.array([
+    [2393.952166119461, -3.410605131648481e-13, 932.3821770809047],
+    [0, 2398.118540286656, 628.2649953288065],
+    [0, 0, 1]
+])
 
-# Set parameters and initialize variables
-densify = False  # Placeholder for densification; to be considered separately.
-downscale = 2    # Example downscale factor; adjust as necessary.
-gtol_thresh = 0.5  # Threshold for bundle adjustment gradient termination.
-adjust_bundle = False  # Set to True if bundle adjustment is used.
-
-
-# Load and sort images
-img_dir = './gustav'
+# Parameters
+gtol_thresh = 0.5  # Gradient termination threshold for bundle adjustment
+adjust_bundle = False  # Toggle for using bundle adjustment
+img_dir = './gustav'  # Directory containing images
 img_list = sorted([img for img in os.listdir(img_dir) if img.lower().endswith(('.jpg', '.png'))])
 images = [cv.imread(os.path.join(img_dir, img)) for img in img_list]
-tot_imgs = len(images) - 2  # Number of image pairs to process
+tot_imgs = len(images) - 2  # Total number of image pairs to process
 
+# Initialize variables
+pose0 = np.eye(3, 4)  # Identity matrix for the first frame's pose
+pose1 = np.zeros((3, 4))  # Placeholder for the second frame's pose
+point_cloud = None  # 3D points will be stored here
 
-# ---------------------- Main loop starts here ------------------------------------ #
-
-# Initialize camera matrices and transformations
-pose0 = np.eye(3, 4)  # Initial pose for the first frame
-pose1 = np.zeros((3, 4))  # Placeholder for subsequent poses
-point_cloud = None  # 3D points
-colorstot = np.zeros((1, 3))  # Corresponding colors
-
-
+# Step 1: Process the first pair of images
 img0 = images[0]
 img1 = images[1]
 
-# # downscale if needed
-# img0 = img_downscale(images[0], downscale)
-# img1 = img_downscale(images[1], downscale)
-
+# Match keypoints between the first two images
 left_pts_ref, right_pts_ref = match_keypoints_flann(img0, img1)
 
-# Compute the essential matrix and recover pose
-E, mask = cv.findEssentialMat(left_pts_ref, right_pts_ref, K, method=cv.RANSAC, prob=0.999, threshold=0.4) # type: ignore
+# Compute the Essential Matrix and filter inliers
+E, mask = cv.findEssentialMat(left_pts_ref, right_pts_ref, K, method=cv.RANSAC, prob=0.999, threshold=0.4)
+left_pts_ref = left_pts_ref[mask.ravel() == 1]
+right_pts_ref = right_pts_ref[mask.ravel() == 1]
 
-left_pts_ref = left_pts_ref[mask.ravel() == 1] # type: ignore
-right_pts_ref = right_pts_ref[mask.ravel() == 1] # type: ignore
-
-# Recover rotation & translation using Essential matrix
+# Recover pose (rotation and translation)
 _, R, t, mask = cv.recoverPose(E, left_pts_ref, right_pts_ref, K)
 left_pts_ref = left_pts_ref[mask.ravel() > 0]
 right_pts_ref = right_pts_ref[mask.ravel() > 0]
 
-# Update pose and find projection matrices
+# Update the pose matrix
 pose1[:3, :3] = np.dot(R, pose0[:3, :3])
 pose1[:3, 3] = pose0[:3, 3] + np.dot(pose0[:3, :3], t.ravel())
+
+# Compute projection matrices
 P1 = np.dot(K, pose0)
 P2 = np.dot(K, pose1)
 
-# Get 3d points for first image pair
+# Triangulate points and calculate reprojection error
 points_3d = triangulate(P1, P2, left_pts_ref, right_pts_ref)
-error, points_3d, repro_pts = reprojection_error(points_3d, right_pts_ref, pose1, K, homogenity = 0)
+error, points_3d, _ = reprojection_error(points_3d, right_pts_ref, pose1, K, homogenity=0)
+print(f"Initial reprojection error: {error}")
 
-print(points_3d.dtype, right_pts_ref.dtype)
-print("REPROJECTION ERROR: ", error)
+point_cloud = points_3d  # Initialize point cloud
 
-point_cloud = points_3d
-
-# plot_3d(point_cloud)
-
+# Step 2: Process remaining images incrementally
 prev_img = img1
-# Expand the 3D point cloud by processing the remaining image incrementally
-for next_img in tqdm(images[2:]):
-    
+for i, next_img in enumerate(tqdm(images[2:], desc="Processing images")):
+    # Match keypoints between the previous and current image
     left_pts, right_pts = match_keypoints_flann(prev_img, next_img)
 
-    # Find common points to use for PnP, also filter out unique pts only to triangulate
-    com_idx_left, com_idx_right, unique_pts_left, unique_pts_right = common_points(right_pts_ref, left_pts, right_pts)
+    if i != 0:
+        points_3d = triangulate(P1, P2, left_pts_ref, right_pts_ref)
 
+    # Find common points for PnP and triangulation
+    com_idx_left, com_idx_right, unique_pts_left, unique_pts_right = common_points(right_pts_ref, left_pts, right_pts)
+    print(points_3d.shape)
+    print(com_idx_left)
+    com_pts_3d = points_3d[com_idx_left]
     com_pts_ref = right_pts_ref[com_idx_left]
     com_pts_left = left_pts[com_idx_right]
     com_pts_right = right_pts[com_idx_right]
-    com_pts_3d = points_3d[com_idx_left]
-    
 
-    # Estimate new image's pose using PnP
-    Rot, trans, points_3d, com_pts_left, com_pts_right = PnP(com_pts_3d, com_pts_left, com_pts_right, K, initial=0)
+    # Estimate new pose using PnP
+    Rot, trans, com_pts_3d, com_pts_left, com_pts_right = PnP(com_pts_3d, com_pts_left, com_pts_right, K, initial=0)
     pose_new = np.hstack((Rot, trans))
-    Pnew = np.dot(K, pose_new)
+    P_new = np.dot(K, pose_new)
 
+    # Reprojection error for PnP result
+    error, _, _ = reprojection_error(com_pts_3d, com_pts_right, pose_new, K, homogenity=0)
+    print(f"Reprojection error after PnP (image {i+2}): {error}")
 
-    # Reprojection error
-    error, _ , _ = reprojection_error(points_3d, com_pts_left, pose_new, K, homogenity=0)
-    print(error)
-    
+    # Triangulate new points
+    new_pts_3d = triangulate(P2, P_new, unique_pts_left, unique_pts_right)
+    error, _, _ = reprojection_error(new_pts_3d, unique_pts_right, pose_new, K, homogenity=0)
+    print(f"Reprojection error for new points (image {i+2}): {error}")
 
-    new_pts_3d = triangulate(P2, Pnew, unique_pts_left, unique_pts_right)
-    error, _ , _ = reprojection_error(new_pts_3d, unique_pts_right, pose_new, K, homogenity=0)
-    print(error)
-
-    print(point_cloud.shape)
+    # Append new points to the point cloud
     point_cloud = np.vstack((point_cloud, new_pts_3d))
-    print(point_cloud.shape)
-    plot_3d(point_cloud)
 
-    # Bundle Adjustment
-    points_3d, temp2, Rtnew = bundle_adjustment(points_3d, temp2, Rtnew, K, gtol_thresh)
-    Pnew = np.dot(K, Rtnew)
-    error, points_3d, _ = reprojection_error(points_3d, temp2, Rtnew, K, homogenity=0)
+    # Optionally perform bundle adjustment
+    if adjust_bundle:
+        new_pts_3d, right_pts_adjusted, Rt_new = bundle_adjustment(new_pts_3d, com_pts_right, pose_new, K, gtol_thresh)
+        P_new = np.dot(K, Rt_new)
+        error, _, _ = reprojection_error(new_pts_3d, right_pts_adjusted, Rt_new, K, homogenity=0)
+        print(f"Reprojection error after bundle adjustment (image {i+2}): {error}")
 
-
-    # # Update poses and image data
-    # pose0 = pose1.copy()
-    # P1, P2 = P2, Pnew
-    
-    # prev_img = next_img
-    # left_pts_ref, right_pts_ref = pts_, left_pts
-
-
-#     # Display current image
-#     cv.imshow('image', next_img)
-#     if cv.waitKey(1) & 0xFF == ord('q'):
-#         break
-
-# cv.destroyAllWindows()
+    # Update projection matrix and references
+    P2 = np.copy(P_new)
+    left_pts_ref = np.copy(left_pts)
+    right_pts_ref = np.copy(right_pts)
+    prev_img = np.copy(next_img)
+    break
 
 
-
-
+save_to_ply(point_cloud, filename='output_1.ply')
