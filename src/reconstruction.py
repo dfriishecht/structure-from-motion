@@ -78,15 +78,15 @@ def reprojection_error(X, pts, Rt, K, homogenity):
     if homogenity:
        X = cv.convertPointsFromHomogeneous(X.T)
     
-    proj, _ = cv.projectPoints(X, rotation, translation, K, distCoeffs=None) #proj is Nx2 array of reprojected 2D points
+    proj, _ = cv.projectPoints(X, rotation, translation, K, distCoeffs=None) # type: ignore 
     proj = np.float32(proj[:, 0, :])
     pts = np.float32(pts)
     if homogenity:
-        total_error = cv.norm(proj, pts.T, cv.NORM_L2)
+        total_error = cv.norm(proj, pts.T, cv.NORM_L2)# type: ignore 
     else:
-        total_error = cv.norm(proj, pts, cv.NORM_L2)
+        total_error = cv.norm(proj, pts, cv.NORM_L2)# type: ignore 
     pts = pts.T
-    total_error = total_error / len(proj)
+    total_error = total_error / len(proj)# type: ignore 
 
     return total_error, X, proj
 
@@ -114,7 +114,7 @@ def optimal_reprojection(x):
     rotation_vector, _ = cv.Rodrigues(R)
 
     # Project 3D points into 2D
-    points_2D, _ = cv.projectPoints(X, rotation_vector, t, K, distCoeffs=None)
+    points_2D, _ = cv.projectPoints(X, rotation_vector, t, K, distCoeffs=None) # type: ignore 
     points_2D = points_2D[:, 0, :]  #  (N, 2) for 2D
 
     
