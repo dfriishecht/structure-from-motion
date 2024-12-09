@@ -13,12 +13,19 @@ K = np.array([
     [0, 0, 1]
 ])
 
+downscale = 2
+K[0,0] = K[0,0] / float(downscale)
+K[1,1] = K[1,1] / float(downscale)
+K[0,2] = K[0,2] / float(downscale)
+K[1,2] = K[1,2] / float(downscale)
+
 # Parameters
 gtol_thresh = 0.5  # Gradient termination threshold for bundle adjustment
 adjust_bundle = False  # Toggle for using bundle adjustment
 img_dir = './gustav'  # Directory containing images
 img_list = sorted([img for img in os.listdir(img_dir) if img.lower().endswith(('.jpg', '.png'))])
 images = [cv.imread(os.path.join(img_dir, img)) for img in img_list]
+images = [img_downscale(img, downscale) for img in images]
 tot_imgs = len(images) - 2  # Total number of image pairs to process
 
 # Initialize variables
@@ -30,7 +37,9 @@ point_cloud = None  # 3D points will be stored here
 img0 = images[0]
 img1 = images[1]
 
-# Match keypoints between the first two images
+print(img0.shape)
+
+# Find matched points between the first two images
 left_pts_ref, right_pts_ref = match_keypoints_flann(img0, img1)
 
 # Compute the Essential Matrix and filter inliers
@@ -57,10 +66,13 @@ error, points_3d, _ = reprojection_error(points_3d, right_pts_ref, pose1, K, hom
 print(f"Initial reprojection error: {error}")
 
 point_cloud = points_3d  # Initialize point cloud
+plot_3d(point_cloud)
 
 # Step 2: Process remaining images incrementally
 prev_img = img1
 for i, next_img in enumerate(tqdm(images[2:], desc="Processing images")):
+    break
+    print(next_img.shape)
     # Match keypoints between the previous and current image
     left_pts, right_pts = match_keypoints_flann(prev_img, next_img)
 
@@ -69,8 +81,6 @@ for i, next_img in enumerate(tqdm(images[2:], desc="Processing images")):
 
     # Find common points for PnP and triangulation
     com_idx_left, com_idx_right, unique_pts_left, unique_pts_right = common_points(right_pts_ref, left_pts, right_pts)
-    print(points_3d.shape)
-    print(com_idx_left)
     com_pts_3d = points_3d[com_idx_left]
     com_pts_ref = right_pts_ref[com_idx_left]
     com_pts_left = left_pts[com_idx_right]
@@ -105,7 +115,7 @@ for i, next_img in enumerate(tqdm(images[2:], desc="Processing images")):
     left_pts_ref = np.copy(left_pts)
     right_pts_ref = np.copy(right_pts)
     prev_img = np.copy(next_img)
-    break
+
 
 
 save_to_ply(point_cloud, filename='output_1.ply')
