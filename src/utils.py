@@ -88,5 +88,44 @@ def plot_3d(pts_3d: np.ndarray):
     plt.show()
 
 
+def save_to_ply(point_cloud, filename="output.ply", colors=None):
+    """
+    Save the 3D point cloud to a .ply file.
+    
+    Parameters:
+        point_cloud (numpy.ndarray): Array of shape (N, 3) containing 3D points.
+        filename (str): Name of the output .ply file.
+        colors (numpy.ndarray, optional): Array of shape (N, 3) containing RGB colors for each point.
+    """
+    assert point_cloud.shape[1] == 3, "Point cloud must have shape (N, 3)"
+    
+    if colors is None:
+        # Default to white if no colors are provided
+        colors = np.full((point_cloud.shape[0], 3), 255, dtype=np.uint8)
+
+    assert colors.shape[0] == point_cloud.shape[0], "Colors must have the same number of points"
+    assert colors.shape[1] == 3, "Colors must have shape (N, 3)"
+
+    # Header for the .ply file
+    ply_header = f"""ply
+                    format ascii 1.0
+                    element vertex {len(point_cloud)}
+                    property float x
+                    property float y
+                    property float z
+                    property uchar red
+                    property uchar green
+                    property uchar blue
+                    end_header
+                    """
+    with open(filename, 'w') as ply_file:
+        ply_file.write(ply_header)
+        for point, color in zip(point_cloud, colors):
+            ply_file.write(f"{point[0]} {point[1]} {point[2]} {color[0]} {color[1]} {color[2]}\n")
+
+    print(f"Point cloud saved to {filename}")
+
+
+
 if __name__ == "__main__":
     capture_from_laptop()
