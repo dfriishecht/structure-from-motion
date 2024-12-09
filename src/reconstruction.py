@@ -7,8 +7,10 @@ This file will contain helper functions for the `Incremental Reconstruction` par
 - Outlier Filtering
 - Plotting
 """
+
 import numpy as np
 import cv2 as cv
+from scipy.optimize import least_squares
 
 
 def triangulate(P0: np.ndarray, P1: np.ndarray, pts0: np.ndarray, pts1: np.ndarray):
@@ -88,9 +90,6 @@ def reprojection_error(X, pts, Rt, K, homogenity):
 
     return total_error, X, proj
 
-import numpy as np
-import cv2
-from scipy.optimize import least_squares
 
 def optimal_reprojection(x):
     """
@@ -112,10 +111,10 @@ def optimal_reprojection(x):
     t = Rt[:3, 3]
     
     # Convert rotation matrix to Rodrigues vector
-    rotation_vector, _ = cv2.Rodrigues(R)
+    rotation_vector, _ = cv.Rodrigues(R)
 
     # Project 3D points into 2D
-    points_2D, _ = cv2.projectPoints(X, rotation_vector, t, K, distCoeffs=None)
+    points_2D, _ = cv.projectPoints(X, rotation_vector, t, K, distCoeffs=None)
     points_2D = points_2D[:, 0, :]  #  (N, 2) for 2D
 
     
@@ -179,11 +178,11 @@ def bundle_adjustment(points_3D, uni_points2D, Rt_new, K, reprojection_tolerance
     image_points_3D = corrected_values[21 + num_2D_points:].reshape((-1, 3))
     image_points_2D = image_points_2D.T
 
-    return X, image_points_2D, Rt
+    return points_3D, image_points_2D, Rt_new
 
     
 
-def PnP(X, p, K, d, p_0, initial):
+def PnP(com_pts_3d, com_pts_left, com_pts_right, K, initial ,d = np.zeros((5, 1), dtype=np.float32)):
     """
     Recover camera rotation and translation from 3D and 2D points
 
@@ -195,75 +194,50 @@ def PnP(X, p, K, d, p_0, initial):
         p_0: 
 
     """
-    if initial == 1:
-        X = X[:, 0, :]
-        p = p.T
-        p_0 = p_0.T
+    # if initial == 1:
+    #     X = X[:, 0, :]
+    #     p = p.T
+    #     p_0 = p_0.T
 
+    ret, rvecs, t, inliers = cv.solvePnPRansac(com_pts_3d, com_pts_right, K, d, cv.SOLVEPNP_ITERATIVE) # type: ignore
 
-    ret, rvecs, t, inliers = cv.solvePnPRansac(X, p, K, d, cv.SOLVEPNP_ITERATIVE) # type: ignore
-
+    # Convert from rotation vector to rotation matrix
     R, _ = cv.Rodrigues(rvecs)
-
 
     # Filter out bad 2D-3D correspondences
     if inliers is not None:
-        p = p[inliers[:, 0]]
-        X = X[inliers[:, 0]]
-        p_0 = p_0[inliers[:, 0]]
+        com_pts_left = com_pts_left[inliers[:, 0]]
+        com_pts_right= com_pts_right[inliers[:, 0]]
+        com_pts_3d = com_pts_3d[inliers[:, 0]]
+        
+    return R, t, com_pts_3d, com_pts_left, com_pts_right
 
-    return R, t, p, X, p_0
 
 def common_points(right_pts_ref, left_pts, right_pts):
 
-    idx1 = []
-    idx2 = []
+    com_idx_left = []
+    com_idx_right = []
     for i in range(right_pts_ref.shape[0]):
         match = np.where(left_pts==right_pts_ref[i, :])
         if match[0].size == 0:
             pass
         else:
-            idx1.append(i)
-            idx2.append(match[0][0])
+            com_idx_left.append(i)
+            com_idx_right.append(match[0][0])
         
-    temp_arr1 = np.ma.array(left_pts, mask=False)
-    temp_arr1.mask[idx2] = True
-    temp_arr1 = temp_arr1.compressed()
-    temp_arr1 = temp_arr1.reshape(int(temp_arr1.shape[0] / 2), 2)
+    unique_pts_left = np.ma.array(left_pts, mask=False)
+    unique_pts_left.mask[com_idx_right] = True
+    unique_pts_left = unique_pts_left.compressed()
+    unique_pts_left = unique_pts_left.reshape(int(unique_pts_left.shape[0] / 2), 2)
 
-    temp_arr2 = np.ma.array(right_pts, mask=False)
-    temp_arr2.mask[idx2] = True
-    temp_arr2 = temp_arr2.compressed()
-    temp_arr2 = temp_arr2.reshape(int(temp_arr2.shape[0]/2), 2)
+    unique_pts_right = np.ma.array(right_pts, mask=False)
+    unique_pts_right.mask[com_idx_right] = True
+    unique_pts_right = unique_pts_right.compressed()
+    unique_pts_right = unique_pts_right.reshape(int(unique_pts_right.shape[0]/2), 2)
         
-    return np.array(idx1), np.array(idx2), temp_arr1, temp_arr2
-
-
-
+    return np.array(com_idx_left), np.array(com_idx_right), unique_pts_left, unique_pts_right
 
 if __name__ == "__main__":
 
-    P0 = np.array([
-    [1, 0, 0, 0],
-    [0, 1, 0, 0],
-    [0, 0, 1, 0]
-    ])
-
-    P1 = np.array([
-        [1, 0, 0, -1],
-        [0, 1, 0, 0],
-        [0, 0, 1, 0]
-    ])
-
-    # pts0 = np.random.rand(10,1)
-    # pts1 = np.random.rand(10,1)
-
-    pts0 = np.array([[1, 2], [0.5, 1.5], [1.2, 1.8]])
-    pts1 = np.array([[0.9, 1.8], [0.4, 1.4], [1.1, 1.9]])
-
-    print(pts0.T.shape)
-
-    point3d = triangulate(P0, P1, pts0, pts1)
-    print(point3d)
-    proj = reprojection_error(point3d, pts0, )
+    pass
 
