@@ -10,24 +10,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def extract_features(img: np.ndarray, intr_mat=None, dist_coeff=None) -> tuple:
+def extract_features(img: np.ndarray, intr_mat: np.ndarray | None = None, dist_coeff: np.ndarray | None = None) -> tuple:
     """
-    Extract SIFT feature points from input image; undistort the image if camera parameters are known
+    Extract SIFT (Scale-Invariant Feature Transform) keypoints and descriptors from an input image. Optionally, undistort the image
+    using the provided intrinsic matrix and distortion coefficients.
 
     Args:
-        img
-        intr_mat
-        dist_coeff
+        img (np.ndarray): Input image as a NumPy array, expected in BGR format.
+        intr_mat (np.ndarray, optional): Intrinsic camera matrix for undistorting the image. Defaults to None.
+        dist_coeff (np.ndarray, optional): Distortion coefficients for undistorting the image. Defaults to None.
 
+    Returns:
+        tuple: A tuple containing:
+            - kp (list[cv2.KeyPoint]): List of keypoints detected in the image.
+            - desc (np.ndarray): Corresponding descriptors for the detected keypoints.
     """
-    if intr_mat and dist_coeff:
+    if intr_mat is not None and dist_coeff is not None:
         img = cv.undistort(img, intr_mat, dist_coeff)  # type: ignore
 
     img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     sift = cv.SIFT.create()
     kp, desc = sift.detectAndCompute(img, None)  # type: ignore
     return kp, desc
-
 
 def match_keypoints_bf(img0, img1):
     kp0, desc0 = extract_features(img0)
@@ -45,16 +49,38 @@ def match_keypoints_bf(img0, img1):
     return pts0, pts1
 
 
+
 def match_keypoints_flann(
-    img1, img2, n_trees=5, n_checks=50, lowe_ratio=0.8
-):
+    img1: np.ndarray, 
+    img2: np.ndarray, 
+    n_trees: int = 5, 
+    n_checks: int = 50, 
+    lowe_ratio: float = 0.8
+) -> tuple:
+    """
+    Match SIFT keypoints between two images using the FLANN (Fast Library for Approximate Nearest Neighbors) matcher with a KD-Tree index.
+    Filters matches based on Lowe's ratio test to retain only good matches.
+
+    Args:
+        img1 (np.ndarray): The first input image as a NumPy array.
+        img2 (np.ndarray): The second input image as a NumPy array.
+        n_trees (int, optional): Number of trees in the KD-Tree. Higher values improve precision at the cost of speed. Defaults to 5.
+        n_checks (int, optional): Number of recursive checks during search. Higher values improve precision at the cost of speed. Defaults to 50.
+        lowe_ratio (float, optional): Ratio threshold for Lowe's ratio test. Defaults to 0.8.
+
+    Returns:
+        tuple: A tuple containing:
+            - left_pts (np.ndarray): Array of matched keypoints in the first image.
+            - right_pts (np.ndarray): Array of matched keypoints in the second image.
+    """
     FLANN_INDEX_KDTREE = 1
     index_params = dict(
         algorithm=FLANN_INDEX_KDTREE, trees=n_trees
-    )  # number of trees in the KD-Tree, higher the better, but slower
+    )  # Number of trees in the KD-Tree.
     search_params = dict(
         checks=n_checks
-    )  # number of recursive checks, higher the better, but slower
+    )  # Number of recursive checks during search.
+
     flann = cv.FlannBasedMatcher(index_params, search_params)  # type: ignore
 
     kp1, desc1 = extract_features(img1)
@@ -68,8 +94,8 @@ def match_keypoints_flann(
             if m.distance < lowe_ratio * n.distance:
                 good_matches.append(m)
 
-    left_pts = np.array([kp1[m.queryIdx].pt for m in good_matches]).astype('float32') # type: ignore
-    right_pts = np.array([kp2[m.trainIdx].pt for m in good_matches]).astype('float32') # type: ignore
+    left_pts = np.array([kp1[m.queryIdx].pt for m in good_matches]).astype('float32')  # type: ignore
+    right_pts = np.array([kp2[m.trainIdx].pt for m in good_matches]).astype('float32')  # type: ignore
 
     return left_pts, right_pts
 
