@@ -33,6 +33,7 @@ def extract_features(img: np.ndarray, intr_mat: np.ndarray | None = None, dist_c
     kp, desc = sift.detectAndCompute(img, None)  # type: ignore
     return kp, desc
 
+
 def match_keypoints_bf(img0, img1):
     kp0, desc0 = extract_features(img0)
     kp1, desc1 = extract_features(img1)
@@ -55,7 +56,7 @@ def match_keypoints_flann(
     img2: np.ndarray, 
     n_trees: int = 5, 
     n_checks: int = 50, 
-    lowe_ratio: float = 0.8
+    lowe_ratio: float = 0.7
 ) -> tuple:
     """
     Match SIFT keypoints between two images using the FLANN (Fast Library for Approximate Nearest Neighbors) matcher with a KD-Tree index.
@@ -90,14 +91,13 @@ def match_keypoints_flann(
 
     good_matches = []
     for m, n in matches:
-        if m.trainIdx < len(kp2) and n.trainIdx < len(kp2):
-            if m.distance < lowe_ratio * n.distance:
-                good_matches.append(m)
+        if m.distance < lowe_ratio * n.distance:
+            good_matches.append(m)
 
     left_pts = np.array([kp1[m.queryIdx].pt for m in good_matches]).astype('float32')  # type: ignore
     right_pts = np.array([kp2[m.trainIdx].pt for m in good_matches]).astype('float32')  # type: ignore
 
-    return left_pts, right_pts
+    return good_matches, left_pts, right_pts
 
 
 def normalize_points(points):
