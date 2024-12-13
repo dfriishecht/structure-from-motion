@@ -52,7 +52,7 @@ def triangulate(P0: np.ndarray, P1: np.ndarray, pts0: np.ndarray, pts1: np.ndarr
     return np.array(points_3d)
 
 # Calculation for Reprojection error in main pipeline
-def reprojection_error(X, pts, Rt, K, homogenity):
+def reprojection_error(X, pts, Rt, K):
     """
     Calculates the error between 2D image points and the corresponding 3D
     points projected back down to the image plane.
@@ -69,26 +69,18 @@ def reprojection_error(X, pts, Rt, K, homogenity):
         X
         proj
     """
-    total_error = 0
     R = Rt[:3, :3]
     translation = Rt[:3, 3]
 
     rotation, _ = cv.Rodrigues(R)
-
-    if homogenity:
-       X = cv.convertPointsFromHomogeneous(X.T)
     
     proj, _ = cv.projectPoints(X, rotation, translation, K, distCoeffs=None) # type: ignore 
     proj = np.float32(proj[:, 0, :])
-    pts = np.float32(pts)
-    if homogenity:
-        total_error = cv.norm(proj, pts.T, cv.NORM_L2)# type: ignore 
-    else:
-        total_error = cv.norm(proj, pts, cv.NORM_L2)# type: ignore 
-    pts = pts.T
-    total_error = total_error / len(proj)# type: ignore 
 
-    return total_error, X, proj
+    error = cv.norm(proj, pts, cv.NORM_L2)# type: ignore 
+    error /= len(proj)# type: ignore 
+
+    return error, X, proj
 
 
 def optimal_reprojection(x):
@@ -182,7 +174,7 @@ def bundle_adjustment(points_3D, uni_points2D, Rt_new, K, reprojection_tolerance
 
     
 
-def PnP(com_pts_3d, com_pts_left, com_pts_right, K, initial ,d = np.zeros((5, 1), dtype=np.float32)):
+def PnP(com_pts_3d, com_pts_left, com_pts_right, K ,d = np.zeros((5, 1), dtype=np.float32)):
     """
     Recover camera rotation and translation from 3D and 2D points
 
@@ -192,13 +184,7 @@ def PnP(com_pts_3d, com_pts_left, com_pts_right, K, initial ,d = np.zeros((5, 1)
         K: Camera intrinsic matrix
         d: distortion coefficient
         p_0: 
-
     """
-    # if initial == 1:
-    #     X = X[:, 0, :]
-    #     p = p.T
-    #     p_0 = p_0.T
-
     ret, rvecs, t, inliers = cv.solvePnPRansac(com_pts_3d, com_pts_right, K, d, cv.SOLVEPNP_ITERATIVE) # type: ignore
 
     # Convert from rotation vector to rotation matrix
