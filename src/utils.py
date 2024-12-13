@@ -5,12 +5,12 @@ import cv2 as cv
 import os
 from pathlib import Path
 
-def img_downscale(img, downscale):
+def downsample(img, downscale):
 	downscale = int(downscale/2)
-	i = 1
-	while(i <= downscale):
+	i = 0
+	while(i < downscale):
 		img = cv.pyrDown(img)
-		i = i + 1
+		i += 1
 	return img
 
 
@@ -133,6 +133,39 @@ def save_to_ply(point_cloud, filename="output.ply", colors=None):
             ply_file.write(f"{point[0]} {point[1]} {point[2]} {color[0]} {color[1]} {color[2]}\n")
 
     print(f"Point cloud saved to {filename}")
+
+
+def output(final_cloud,pixel_colour = None):
+    if pixel_colour:
+        output_colors=pixel_colour.reshape(-1, 3)
+    else:
+        output_colors = np.full((final_cloud.shape[0], 3), 255, dtype=np.uint8)
+        
+    output_points=final_cloud.reshape(-1, 3) * 200
+    
+    mesh=np.hstack([output_points,output_colors])
+
+    mesh_mean=np.mean(mesh[:,:3],axis=0)
+    diff=mesh[:,:3]-mesh_mean
+    distance=np.sqrt(diff[:,0]**2+diff[:,1]**2+diff[:,2]**2)
+    
+    index=np.where(distance<np.mean(distance)+300)
+    mesh=mesh[index]
+    ply_header = '''ply
+        format ascii 1.0
+        element vertex %(vert_num)d
+        property float x
+        property float y
+        property float z
+        property uchar blue
+        property uchar green
+        property uchar red
+        end_header
+        '''
+    with open('sparse.ply', 'w') as f:
+        f.write(ply_header % dict(vert_num=len(mesh)))
+        np.savetxt(f,mesh,'%f %f %f %d %d %d')
+    print("Point cloud processed, cleaned and saved successfully!")
 
 
 
